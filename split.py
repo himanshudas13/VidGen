@@ -13,46 +13,35 @@ def load_frames(directory):
         img_array = np.array(img)
         frames.append(img_array)
     
-    # Normalize to [0, 1]
-    frames = np.array(frames) / 255.0  
+    frames = np.array(frames) / 255.0  # Normalize to [0, 1]
     return frames
 
-# Step 2: Reshape frames into desired shape of a convo LSTM layer(rows, sequences, height, width, channels)
-# 20 images in sequence is just a property of this adataset, can be modified
-def reshape_frames(frames, sequence_length=20, num_sequences=80,img_size=(64,64)):
-    
+# Step 2: Reshape frames into (rows, sequences, height, width, channels)
+def reshape_frames(frames, sequence_length=20, num_sequences=80):
     total_frames = len(frames)
-    # Calculate the number of usable frames
     usable_frames = min(total_frames, num_sequences * sequence_length)
-    # Reshape frames to (num_sequences, sequence_length, height, width, channels)
-    reshaped_frames = frames[:usable_frames].reshape((num_sequences, sequence_length, img_size[0], img_size[1], 1))
-    
+    reshaped_frames = frames[:usable_frames].reshape((num_sequences, sequence_length, 64, 64, 1))
     return reshaped_frames
 
-# Step 3: Create shifted frames for training and validation 
-# NOTE THAT INSTEAD OF USING PREVIOUS 20 FRAMES OR ANY FIXED NUMBER OF FRAMES THE INPUT CAN VARY AS PER SEQUENCE LENGTH
+# Step 3: Create shifted frames for training and validation
 def create_shifted_frames(data):
     x = data[:, 0:data.shape[1] - 1, :, :]
     y = data[:, 1:data.shape[1], :, :]
     return x, y
 
 # Step 4: Load, reshape, and split data
-def prepare_data(frame_dir='VidGen/frames_64',img_size=(64,64)):
-    
+def prepare_data(frame_dir='VidGen/frames_64', sequence_length=20, num_sequences=80):
     # Load frames
     frames = load_frames(frame_dir)
+    # Reshape the frames
+    reshaped_frames = reshape_frames(frames, sequence_length, num_sequences)
     
-    # frames is just an 1D array, to reshape it into an 2D array of n training rows each containing m sequence of images
-    sequence_length=20
-    num_sequences=80 
-    
-    reshaped_frames = reshape_frames(frames, sequence_length, num_sequences,img_size)
-    # Split data into training and validation sets
-    X_train, X_val = train_test_split(reshaped_frames, test_size=0.2, random_state=42)
+    # Split data into training and validation sets BEFORE creating shifted frames
+    reshaped_train, reshaped_val = train_test_split(reshaped_frames, test_size=0.2, random_state=42)
 
-    # Create shifted frames for both
-    x_train, y_train = create_shifted_frames(X_train)
-    x_val, y_val = create_shifted_frames(X_val)
+    # Create shifted frames for both training and validation
+    x_train, y_train = create_shifted_frames(reshaped_train)
+    x_val, y_val = create_shifted_frames(reshaped_val)
 
     print(f"Training set shape (x_train, y_train): {x_train.shape}, {y_train.shape}")
     print(f"Validation set shape (x_val, y_val): {x_val.shape}, {y_val.shape}")
